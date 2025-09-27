@@ -1,7 +1,7 @@
 
 const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000/api/v1'
-  : `${window.location.protocol}//${window.location.hostname}/api/v1`;
+  ? 'http://localhost:8000/api/v1'
+  : `${window.location.protocol}//${window.location.hostname.replace('-00-', '-8000-')}/api/v1`;
 
 class ApiService {
   private baseURL: string;
