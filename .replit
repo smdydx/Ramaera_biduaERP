@@ -7,7 +7,7 @@ channel = "stable-25_05"
 packages = ["libxcrypt"]
 
 [workflows]
-runButton = "Project"
+runButton = "CRM HRMS System"
 
 [[workflows.workflow]]
 name = "Project"
@@ -45,6 +45,28 @@ waitForPort = 3000
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "Backend Server"
+author = 48065040
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && python -u main.py"
+
+[[workflows.workflow]]
+name = "CRM HRMS System"
+author = 48065040
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && python -u main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && GENERATE_SOURCEMAP=false PORT=3000 npm start"
 
 [[ports]]
 localPort = 3000

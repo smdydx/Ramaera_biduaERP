@@ -74,6 +74,19 @@ class ApiService {
     });
   }
 
+  async updateCustomer(customerId: string, customerData: any) {
+    return this.request(`/customers/${customerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(customerData),
+    });
+  }
+
+  async deleteCustomer(customerId: string) {
+    return this.request(`/customers/${customerId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Employee endpoints
   async getEmployees() {
     return this.request('/employees');

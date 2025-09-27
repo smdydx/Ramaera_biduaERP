@@ -19,12 +19,8 @@ import './App.css';
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
 
-interface MenuItem {
-  key: string;
-  icon: React.ReactNode;
-  label: string;
-  children?: MenuItem[];
-}
+import type { MenuProps } from 'antd';
+type MenuItem = Required<MenuProps>['items'][number];
 
 const menuItems: MenuItem[] = [
   {
@@ -53,7 +49,7 @@ const menuItems: MenuItem[] = [
       { key: 'leave-requests', icon: <CalendarOutlined />, label: 'Leave Requests' },
     ],
   },
-];
+] as MenuItem[];
 
 function App() {
   const [selectedKey, setSelectedKey] = useState('dashboard');
