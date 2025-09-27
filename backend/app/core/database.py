@@ -1,7 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from typing import Optional
 import logging
-from config import settings
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +17,20 @@ async def connect_to_mongo():
         # Configure options for MongoDB Atlas
         connection_options = {
             'tls': True,
+            'tlsAllowInvalidCertificates': True,  # Allow invalid certificates for development
+            'tlsAllowInvalidHostnames': True,    # Allow invalid hostnames for development
             'authSource': 'admin',
             'maxPoolSize': 10,
             'minPoolSize': 1,
-            'retryWrites': True
+            'retryWrites': True,
+            'w': 'majority'
         }
         
         db.client = AsyncIOMotorClient(
             settings.mongodb_url,
-            serverSelectionTimeoutMS=10000,  # 10 second timeout
-            connectTimeoutMS=10000,
-            socketTimeoutMS=10000,
+            serverSelectionTimeoutMS=5000,  # 5 second timeout
+            connectTimeoutMS=5000,
+            socketTimeoutMS=5000,
             **connection_options
         )
         db.database = db.client[settings.database_name]
@@ -66,7 +69,7 @@ async def create_indexes():
         logger.warning("Database not connected, skipping index creation")
         return
         
-    from models import DATABASE_INDEXES
+    from ..models.models import DATABASE_INDEXES
     
     try:
         for collection_name, indexes in DATABASE_INDEXES.items():

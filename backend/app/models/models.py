@@ -3,7 +3,7 @@ from datetime import datetime, date
 from bson import ObjectId
 from enum import Enum
 
-# Import enums directly since we can't import from schemas
+# Enums for various status types
 class UserRole(str, Enum):
     ADMIN = "admin"
     HR_MANAGER = "hr_manager" 
