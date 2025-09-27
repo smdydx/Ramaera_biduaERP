@@ -55,12 +55,15 @@ async def connect_to_mongo():
 
 async def close_mongo_connection():
     """Close MongoDB connection."""
-    if db.client:
+    if db.client is not None:
         db.client.close()
-        logger.info("MongoDB connection closed")
+        logger.info("Disconnected from MongoDB")
 
 async def get_database():
     """Get database instance for dependency injection."""
+    if db.database is None:
+        logger.warning("Database not connected")
+        return None
     return db.database
 
 async def create_indexes():

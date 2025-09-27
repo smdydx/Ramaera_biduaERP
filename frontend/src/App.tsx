@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { MenuProps } from 'antd';
 import { ConfigProvider, Layout, Menu, Avatar, Dropdown, Space, Badge, Typography, Card, Row, Col, Statistic, Table, Tag } from 'antd';
 import { 
@@ -54,6 +54,24 @@ const menuItems: MenuItem[] = [
 function App() {
   const [selectedKey, setSelectedKey] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
+  const [backendStatus, setBackendStatus] = useState('checking');
+
+  useEffect(() => {
+    // Check backend connectivity
+    const checkBackend = async () => {
+      try {
+        const response = await fetch('/api/v1/status');
+        if (response.ok) {
+          setBackendStatus('connected');
+        } else {
+          setBackendStatus('error');
+        }
+      } catch (error) {
+        setBackendStatus('disconnected');
+      }
+    };
+    checkBackend();
+  }, []);
 
   const userMenu = (
     <Menu>
@@ -254,6 +272,9 @@ function App() {
             </Title>
             
             <Space size="large">
+              <Tag color={backendStatus === 'connected' ? 'green' : 'red'}>
+                API: {backendStatus}
+              </Tag>
               <Badge count={5}>
                 <BellOutlined style={{ fontSize: '18px', color: '#666' }} />
               </Badge>
