@@ -56,7 +56,7 @@ async def health_check(db = Depends(get_database)):
             db_status = "disconnected"
     except Exception:
         db_status = "error"
-    
+
     return {
         "status": "healthy",
         "database": db_status,
@@ -74,7 +74,7 @@ async def api_status():
         "api_version": "v1",
         "modules": {
             "crm": "initialized",
-            "hrms": "initialized", 
+            "hrms": "initialized",
             "auth": "initialized"
         }
     }

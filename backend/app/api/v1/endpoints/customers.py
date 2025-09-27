@@ -1,10 +1,9 @@
-
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
-from ...schemas.schemas import CustomerCreate, CustomerUpdate, CustomerResponse
-from ...models.models import CustomerModel
-from ...utils.database import DatabaseUtils
-from ...middleware.auth import get_current_user
+from app.schemas.schemas import CustomerCreate, CustomerUpdate, CustomerResponse
+from app.models.models import CustomerModel
+from app.utils.database import DatabaseUtils
+from app.middleware.auth import get_current_user
 
 router = APIRouter()
 
@@ -22,14 +21,14 @@ async def get_customers(
         filters["status"] = status_filter
     if industry_filter:
         filters["industry"] = industry_filter
-    
+
     customers = await DatabaseUtils.find_many(
         CustomerModel.collection_name,
         filters,
         skip=skip,
         limit=limit
     )
-    
+
     return [CustomerResponse(**customer) for customer in customers]
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
@@ -51,9 +50,9 @@ async def create_customer(
     """Create a new customer"""
     customer_model = CustomerModel(**customer.dict())
     result = await DatabaseUtils.create(CustomerModel.collection_name, customer_model.to_dict())
-    
+
     created_customer = await DatabaseUtils.find_by_id(
-        CustomerModel.collection_name, 
+        CustomerModel.collection_name,
         str(result.inserted_id)
     )
     return CustomerResponse(**created_customer)
@@ -71,11 +70,11 @@ async def update_customer(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Customer not found"
         )
-    
+
     update_data = customer_update.dict(exclude_unset=True)
     if update_data:
         await DatabaseUtils.update_by_id(CustomerModel.collection_name, customer_id, update_data)
-    
+
     updated_customer = await DatabaseUtils.find_by_id(CustomerModel.collection_name, customer_id)
     return CustomerResponse(**updated_customer)
 
@@ -88,7 +87,7 @@ async def delete_customer(customer_id: str, current_user = Depends(get_current_u
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Customer not found"
         )
-    
+
     await DatabaseUtils.delete_by_id(CustomerModel.collection_name, customer_id)
     return {"message": "Customer deleted successfully"}
 
@@ -97,15 +96,15 @@ async def get_customer_stats(current_user = Depends(get_current_user)):
     """Get customer statistics"""
     total_customers = await DatabaseUtils.count_documents(CustomerModel.collection_name)
     active_customers = await DatabaseUtils.count_documents(
-        CustomerModel.collection_name, 
+        CustomerModel.collection_name,
         {"status": "active"}
     )
-    
+
     return {
         "total_customers": total_customers,
         "active_customers": active_customers,
         "prospect_customers": await DatabaseUtils.count_documents(
-            CustomerModel.collection_name, 
+            CustomerModel.collection_name,
             {"status": "prospect"}
         )
     }
