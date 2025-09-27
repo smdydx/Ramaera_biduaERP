@@ -41,19 +41,19 @@ class AttendanceStatus(str, Enum):
     HALF_DAY = "half_day"
     LATE = "late"
 
-# Database models using Motor/PyMongo
+# Base model class
 class BaseModel:
     """Base model with common fields and methods"""
-    
+
     def __init__(self, **data):
         for key, value in data.items():
             setattr(self, key, value)
-        
+
         if not hasattr(self, 'created_at'):
             self.created_at = datetime.utcnow()
         if not hasattr(self, 'updated_at'):
             self.updated_at = datetime.utcnow()
-    
+
     def to_dict(self):
         """Convert model to dictionary"""
         result = {}
@@ -71,7 +71,7 @@ class BaseModel:
 class UserModel(BaseModel):
     """User model for authentication and authorization"""
     collection_name = "users"
-    
+
     def __init__(self, **data):
         super().__init__(**data)
         self._id = data.get('_id')
@@ -83,42 +83,10 @@ class UserModel(BaseModel):
         self.is_active: bool = data.get('is_active', True)
         self.last_login: Optional[datetime] = data.get('last_login')
 
-class ContactModel(BaseModel):
-    """Contact model for CRM"""
-    collection_name = "contacts"
-    
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.name: str = data.get('name')
-        self.email: Optional[str] = data.get('email')
-        self.phone: Optional[str] = data.get('phone')
-        self.company: Optional[str] = data.get('company')
-        self.position: Optional[str] = data.get('position')
-        self.notes: Optional[str] = data.get('notes')
-
-class LeadModel(BaseModel):
-    """Lead model for CRM"""
-    collection_name = "leads"
-    
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.title: str = data.get('title')
-        self.description: Optional[str] = data.get('description')
-        self.status: LeadStatus = data.get('status', LeadStatus.NEW)
-        self.source: Optional[str] = data.get('source')
-        self.estimated_value: Optional[float] = data.get('estimated_value')
-        self.expected_close_date: Optional[date] = data.get('expected_close_date')
-        self.contact_id: Optional[str] = data.get('contact_id')
-        self.assigned_to: Optional[str] = data.get('assigned_to')
-
 class CustomerModel(BaseModel):
     """Customer model for CRM"""
     collection_name = "customers"
-    
+
     def __init__(self, **data):
         super().__init__(**data)
         self._id = data.get('_id')
@@ -132,10 +100,46 @@ class CustomerModel(BaseModel):
         self.billing_address: Optional[str] = data.get('billing_address')
         self.notes: Optional[str] = data.get('notes')
 
+class LeadModel(BaseModel):
+    """Lead model for CRM"""
+    collection_name = "leads"
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._id = data.get('_id')
+        self.id = data.get('id', str(ObjectId()))
+        self.name: str = data.get('name')
+        self.email: Optional[str] = data.get('email')
+        self.phone: Optional[str] = data.get('phone')
+        self.company: Optional[str] = data.get('company')
+        self.source: Optional[str] = data.get('source')
+        self.status: LeadStatus = data.get('status', LeadStatus.NEW)
+        self.notes: Optional[str] = data.get('notes')
+        self.assigned_to: Optional[str] = data.get('assigned_to')
+
+class EmployeeModel(BaseModel):
+    """Employee model for HRMS"""
+    collection_name = "employees"
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._id = data.get('_id')
+        self.id = data.get('id', str(ObjectId()))
+        self.employee_id: str = data.get('employee_id')
+        self.full_name: str = data.get('full_name')
+        self.email: str = data.get('email')
+        self.phone: Optional[str] = data.get('phone')
+        self.department_id: Optional[str] = data.get('department_id')
+        self.position: str = data.get('position')
+        self.hire_date: date = data.get('hire_date')
+        self.salary: Optional[float] = data.get('salary')
+        self.status: EmployeeStatus = data.get('status', EmployeeStatus.ACTIVE)
+        self.manager_id: Optional[str] = data.get('manager_id')
+
 class DepartmentModel(BaseModel):
     """Department model for HRMS"""
     collection_name = "departments"
-    
+
     def __init__(self, **data):
         super().__init__(**data)
         self._id = data.get('_id')
@@ -144,56 +148,16 @@ class DepartmentModel(BaseModel):
         self.description: Optional[str] = data.get('description')
         self.manager_id: Optional[str] = data.get('manager_id')
 
-class EmployeeModel(BaseModel):
-    """Employee model for HRMS"""
-    collection_name = "employees"
-    
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.employee_id: str = data.get('employee_id')  # Company employee ID
-        self.user_id: Optional[str] = data.get('user_id')  # Link to User account
-        self.first_name: str = data.get('first_name')
-        self.last_name: str = data.get('last_name')
-        self.email: str = data.get('email')
-        self.phone: Optional[str] = data.get('phone')
-        self.date_of_birth: Optional[date] = data.get('date_of_birth')
-        self.hire_date: date = data.get('hire_date')
-        self.department_id: Optional[str] = data.get('department_id')
-        self.position: str = data.get('position')
-        self.salary: Optional[float] = data.get('salary')
-        self.manager_id: Optional[str] = data.get('manager_id')
-        self.status: EmployeeStatus = data.get('status', EmployeeStatus.ACTIVE)
-        self.address: Optional[str] = data.get('address')
-        self.emergency_contact: Optional[Dict[str, Any]] = data.get('emergency_contact')
-
-class AttendanceModel(BaseModel):
-    """Attendance model for HRMS"""
-    collection_name = "attendance"
-    
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.employee_id: str = data.get('employee_id')
-        self.date: date = data.get('date')
-        self.check_in: Optional[datetime] = data.get('check_in')
-        self.check_out: Optional[datetime] = data.get('check_out')
-        self.status: AttendanceStatus = data.get('status', AttendanceStatus.PRESENT)
-        self.hours_worked: Optional[float] = data.get('hours_worked')
-        self.notes: Optional[str] = data.get('notes')
-
 class LeaveRequestModel(BaseModel):
     """Leave request model for HRMS"""
     collection_name = "leave_requests"
-    
+
     def __init__(self, **data):
         super().__init__(**data)
         self._id = data.get('_id')
         self.id = data.get('id', str(ObjectId()))
         self.employee_id: str = data.get('employee_id')
-        self.leave_type: str = data.get('leave_type')  # Annual, Sick, Personal, etc.
+        self.leave_type: str = data.get('leave_type')
         self.start_date: date = data.get('start_date')
         self.end_date: date = data.get('end_date')
         self.days_requested: int = data.get('days_requested')
@@ -202,54 +166,61 @@ class LeaveRequestModel(BaseModel):
         self.approved_by: Optional[str] = data.get('approved_by')
         self.approved_at: Optional[datetime] = data.get('approved_at')
 
-# Database indexes for better performance
+class AttendanceModel(BaseModel):
+    """Attendance model for HRMS"""
+    collection_name = "attendance"
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._id = data.get('_id')
+        self.id = data.get('id', str(ObjectId()))
+        self.employee_id: str = data.get('employee_id')
+        self.date: date = data.get('date', datetime.utcnow().date())
+        self.check_in: datetime = data.get('check_in')
+        self.check_out: Optional[datetime] = data.get('check_out')
+        self.hours_worked: Optional[float] = data.get('hours_worked')
+        self.status: AttendanceStatus = data.get('status', AttendanceStatus.PRESENT)
+        self.notes: Optional[str] = data.get('notes')
+
+# Database indexes for optimal performance
 DATABASE_INDEXES = {
     "users": [
-        {"key": [("email", 1)], "unique": True},
-        {"key": [("role", 1)]},
-        {"key": [("is_active", 1)]},
-    ],
-    "contacts": [
-        {"key": [("email", 1)]},
-        {"key": [("company", 1)]},
-        {"key": [("name", "text")]},
-    ],
-    "leads": [
-        {"key": [("status", 1)]},
-        {"key": [("assigned_to", 1)]},
-        {"key": [("contact_id", 1)]},
-        {"key": [("expected_close_date", 1)]},
-        {"key": [("created_at", -1)]},
+        {"keys": [("email", 1)], "unique": True},
+        {"keys": [("role", 1)]},
+        {"keys": [("is_active", 1)]}
     ],
     "customers": [
-        {"key": [("email", 1)]},
-        {"key": [("company", 1)]},
-        {"key": [("status", 1)]},
-        {"key": [("name", "text")]},
+        {"keys": [("email", 1)]},
+        {"keys": [("company", 1)]},
+        {"keys": [("status", 1)]},
+        {"keys": [("industry", 1)]}
     ],
-    "departments": [
-        {"key": [("name", 1)], "unique": True},
-        {"key": [("manager_id", 1)]},
+    "leads": [
+        {"keys": [("email", 1)]},
+        {"keys": [("status", 1)]},
+        {"keys": [("assigned_to", 1)]},
+        {"keys": [("source", 1)]}
     ],
     "employees": [
-        {"key": [("employee_id", 1)], "unique": True},
-        {"key": [("email", 1)], "unique": True},
-        {"key": [("user_id", 1)]},
-        {"key": [("department_id", 1)]},
-        {"key": [("manager_id", 1)]},
-        {"key": [("status", 1)]},
-        {"key": [("hire_date", 1)]},
+        {"keys": [("employee_id", 1)], "unique": True},
+        {"keys": [("email", 1)], "unique": True},
+        {"keys": [("department_id", 1)]},
+        {"keys": [("status", 1)]},
+        {"keys": [("manager_id", 1)]}
     ],
-    "attendance": [
-        {"key": [("employee_id", 1), ("date", 1)], "unique": True},
-        {"key": [("date", -1)]},
-        {"key": [("status", 1)]},
+    "departments": [
+        {"keys": [("name", 1)], "unique": True},
+        {"keys": [("manager_id", 1)]}
     ],
     "leave_requests": [
-        {"key": [("employee_id", 1)]},
-        {"key": [("status", 1)]},
-        {"key": [("start_date", 1)]},
-        {"key": [("approved_by", 1)]},
-        {"key": [("created_at", -1)]},
+        {"keys": [("employee_id", 1)]},
+        {"keys": [("status", 1)]},
+        {"keys": [("start_date", 1)]},
+        {"keys": [("approved_by", 1)]}
+    ],
+    "attendance": [
+        {"keys": [("employee_id", 1), ("date", 1)], "unique": True},
+        {"keys": [("date", 1)]},
+        {"keys": [("status", 1)]}
     ]
 }

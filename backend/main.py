@@ -64,7 +64,10 @@ async def health_check(db = Depends(get_database)):
         "environment": "development"
     }
 
-# API Routes will be added here
+# Include API routes
+from app.api.v1.api import api_router
+app.include_router(api_router, prefix="/api/v1")
+
 @app.get("/api/v1/status")
 async def api_status():
     return {
