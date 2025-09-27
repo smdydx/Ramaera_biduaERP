@@ -14,16 +14,41 @@ db = Database()
 async def connect_to_mongo():
     """Connect to MongoDB."""
     try:
-        db.client = AsyncIOMotorClient(settings.mongodb_url)
+        # Configure options for MongoDB Atlas
+        connection_options = {
+            'tls': True,
+            'authSource': 'admin',
+            'maxPoolSize': 10,
+            'minPoolSize': 1,
+            'retryWrites': True
+        }
+        
+        db.client = AsyncIOMotorClient(
+            settings.mongodb_url,
+            serverSelectionTimeoutMS=10000,  # 10 second timeout
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000,
+            **connection_options
+        )
         db.database = db.client[settings.database_name]
         
         # Test the connection
         await db.client.admin.command('ping')
         logger.info(f"Successfully connected to MongoDB: {settings.database_name}")
         
+        # Create indexes
+        await create_indexes()
+        
     except Exception as e:
         logger.error(f"Failed to connect to MongoDB: {e}")
-        raise
+        if settings.debug:
+            # For development, continue without database connection
+            logger.warning("Running in development mode without database connection")
+            db.client = None
+            db.database = None
+        else:
+            # In production, fail fast
+            raise
 
 async def close_mongo_connection():
     """Close MongoDB connection."""
@@ -34,3 +59,20 @@ async def close_mongo_connection():
 async def get_database():
     """Get database instance for dependency injection."""
     return db.database
+
+async def create_indexes():
+    """Create database indexes for optimal performance."""
+    if not db.database:
+        logger.warning("Database not connected, skipping index creation")
+        return
+        
+    from models import DATABASE_INDEXES
+    
+    try:
+        for collection_name, indexes in DATABASE_INDEXES.items():
+            collection = db.database[collection_name]
+            for index_spec in indexes:
+                await collection.create_index(**index_spec)
+        logger.info("Database indexes created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create database indexes: {e}")

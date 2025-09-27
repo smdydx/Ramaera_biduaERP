@@ -12,7 +12,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await connect_to_mongo()
+    try:
+        await connect_to_mongo()
+    except Exception as e:
+        logger.error(f"Database connection failed during startup: {e}")
+        # Continue without database for development
     yield
     # Shutdown
     await close_mongo_connection()

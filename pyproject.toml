@@ -15,4 +15,5 @@ dependencies = [
     "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.20",
     "uvicorn[standard]>=0.37.0",
+    "pymongo[srv]>=4.15.1",
 ]

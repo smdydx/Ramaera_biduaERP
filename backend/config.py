@@ -6,8 +6,8 @@ class Settings(BaseSettings):
     mongodb_url: str = "mongodb://localhost:27017"
     database_name: str = "crm_hrms_db"
     
-    # Security configuration
-    secret_key: str = "your-secret-key-change-in-production"
+    # Security configuration  
+    secret_key: str = "development-key-only-change-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     
@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        
+    def validate_production_settings(self):
+        """Validate settings for production environment."""
+        if not self.debug and self.secret_key == "development-key-only-change-in-production":
+            raise ValueError("SECRET_KEY must be set in production environment")
+        if not self.debug and "localhost" in self.mongodb_url:
+            raise ValueError("MONGODB_URL must be set to actual database in production")
 
 # Global settings instance
 settings = Settings()
