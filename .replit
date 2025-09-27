@@ -7,7 +7,7 @@ channel = "stable-25_05"
 packages = ["libxcrypt"]
 
 [workflows]
-runButton = "CRM HRMS Full Stack"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
@@ -26,25 +26,25 @@ args = "Frontend React"
 name = "Backend API"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend && python main.py"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
+waitForPort = 8000
 
 [[workflows.workflow]]
 name = "Frontend React"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd frontend && GENERATE_SOURCEMAP=false PORT=3000 npm start"
-waitForPort = 3000
-
-[workflows.workflow.metadata]
-outputType = "console"
+args = "cd frontend && npm start"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Backend Server"
@@ -92,3 +92,11 @@ externalPort = 3001
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 37389
+externalPort = 3002
