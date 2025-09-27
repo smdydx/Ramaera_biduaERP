@@ -1,72 +1,102 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from typing import Annotated
-from ....schemas.schemas import Token, UserLogin, UserCreate, UserResponse
-from ....services.auth_service import AuthService
-from ....core.database import get_database
+from fastapi.security import OAuth2PasswordRequestForm
+from datetime import timedelta
+from ...core.config import settings
+from ...core.security import verify_password, get_password_hash, create_access_token
+from ...schemas.schemas import UserCreate, UserResponse, Token, UserLogin
+from ...models.models import UserModel
+from ...utils.database import DatabaseUtils
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 @router.post("/register", response_model=UserResponse)
-async def register(user_data: UserCreate, db = Depends(get_database)):
+async def register(user: UserCreate):
     """Register a new user"""
-    if not db:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
-        )
-    
-    auth_service = AuthService(db)
-    try:
-        user = await auth_service.create_user(user_data)
-        return user
-    except ValueError as e:
+    # Check if user already exists
+    existing_user = await DatabaseUtils.find_one(
+        UserModel.collection_name, 
+        {"email": user.email}
+    )
+    if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Email already registered"
         )
+    
+    # Create new user
+    hashed_password = get_password_hash(user.password)
+    user_data = {
+        "email": user.email,
+        "full_name": user.full_name,
+        "hashed_password": hashed_password,
+        "role": user.role,
+        "is_active": True
+    }
+    
+    user_model = UserModel(**user_data)
+    result = await DatabaseUtils.create(UserModel.collection_name, user_model.to_dict())
+    
+    return UserResponse(
+        id=str(result.inserted_id),
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        is_active=True
+    )
 
 @router.post("/login", response_model=Token)
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db = Depends(get_database)):
-    """Login and get access token"""
-    if not db:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
-        )
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    """Authenticate user and return access token"""
+    user = await DatabaseUtils.find_one(
+        UserModel.collection_name,
+        {"email": form_data.username}
+    )
     
-    auth_service = AuthService(db)
-    user = await auth_service.authenticate_user(form_data.username, form_data.password)
-    
-    if not user:
+    if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    access_token = auth_service.create_access_token(data={"sub": user["email"]})
+    if not user["is_active"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": str(user["_id"])}, expires_delta=access_token_expires
+    )
+    
+    # Update last login
+    await DatabaseUtils.update_by_id(
+        UserModel.collection_name,
+        str(user["_id"]),
+        {"last_login": "utcnow()"}
+    )
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/me", response_model=UserResponse)
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db = Depends(get_database)):
-    """Get current user information"""
-    if not db:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
-        )
+@router.post("/login-json", response_model=Token)
+async def login_json(user_login: UserLogin):
+    """JSON-based login endpoint"""
+    user = await DatabaseUtils.find_one(
+        UserModel.collection_name,
+        {"email": user_login.email}
+    )
     
-    auth_service = AuthService(db)
-    user = await auth_service.get_current_user(token)
-    
-    if not user:
+    if not user or not verify_password(user_login.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Invalid email or password"
         )
     
-    return user
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": str(user["_id"])}, expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
