@@ -25,7 +25,7 @@ async def connect_to_mongo():
             'retryWrites': True,
             'w': 'majority'
         }
-        
+
         db.client = AsyncIOMotorClient(
             settings.mongodb_url,
             serverSelectionTimeoutMS=5000,  # 5 second timeout
@@ -34,14 +34,14 @@ async def connect_to_mongo():
             **connection_options
         )
         db.database = db.client[settings.database_name]
-        
+
         # Test the connection
         await db.client.admin.command('ping')
         logger.info(f"Successfully connected to MongoDB: {settings.database_name}")
-        
+
         # Create indexes
         await create_indexes()
-        
+
     except Exception as e:
         logger.error(f"Failed to connect to MongoDB: {e}")
         if settings.debug:
@@ -68,9 +68,9 @@ async def create_indexes():
     if not db.database:
         logger.warning("Database not connected, skipping index creation")
         return
-        
+
     from ..models.models import DATABASE_INDEXES
-    
+
     try:
         for collection_name, indexes in DATABASE_INDEXES.items():
             collection = db.database[collection_name]

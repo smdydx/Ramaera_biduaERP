@@ -7,7 +7,7 @@ channel = "stable-25_05"
 packages = ["libxcrypt"]
 
 [workflows]
-runButton = "CRM HRMS System"
+runButton = "CRM HRMS Full Stack"
 
 [[workflows.workflow]]
 name = "Project"
@@ -67,6 +67,19 @@ args = "cd backend && python -u main.py"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd frontend && GENERATE_SOURCEMAP=false PORT=3000 npm start"
+
+[[workflows.workflow]]
+name = "CRM HRMS Full Stack"
+author = 48065040
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && python main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && PORT=3001 GENERATE_SOURCEMAP=false BROWSER=none npm start"
 
 [[ports]]
 localPort = 3000
