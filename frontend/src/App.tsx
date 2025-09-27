@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import type { MenuProps } from 'antd';
 import { ConfigProvider, Layout, Menu, Avatar, Dropdown, Space, Badge, Typography, Card, Row, Col, Statistic, Table, Tag } from 'antd';
 import { 
   UserOutlined, 
@@ -19,7 +20,6 @@ import './App.css';
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
 
-import type { MenuProps } from 'antd';
 type MenuItem = Required<MenuProps>['items'][number];
 
 const menuItems: MenuItem[] = [
@@ -135,7 +135,7 @@ function App() {
 
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={16}>
-          <Card title="Recent Activities" extra={<a href="#">View All</a>}>
+          <Card title="Recent Activities" extra={<a href="/activities">View All</a>}>
             <Table 
               dataSource={recentActivities} 
               columns={activityColumns}
@@ -238,10 +238,19 @@ function App() {
             zIndex: 10
           }}>
             <Title level={4} style={{ margin: 0, color: '#262626' }}>
-              {menuItems.find(item => 
-                item.key === selectedKey || 
-                item.children?.some(child => child.key === selectedKey)
-              )?.label || 'Dashboard'}
+              {(() => {
+                const found = menuItems.find(item => {
+                  if (!item || typeof item === 'string') return false;
+                  if ('key' in item && item.key === selectedKey) return true;
+                  if ('children' in item && item.children) {
+                    return item.children.some(child => 
+                      child && typeof child !== 'string' && 'key' in child && child.key === selectedKey
+                    );
+                  }
+                  return false;
+                });
+                return (found && typeof found !== 'string' && 'label' in found ? found.label : 'Dashboard') as string;
+              })()}
             </Title>
             
             <Space size="large">
