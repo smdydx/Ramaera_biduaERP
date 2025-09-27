@@ -1,9 +1,10 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
 
 class Settings(BaseSettings):
     # Database configuration
-    mongodb_url: str = "mongodb://localhost:27017"
+    database_url: str = os.getenv("DATABASE_URL", "postgresql://localhost:5432/crm_hrms_db")
     database_name: str = "crm_hrms_db"
     
     # Security configuration  

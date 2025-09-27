@@ -17,4 +17,6 @@ dependencies = [
     "uvicorn[standard]>=0.37.0",
     "pymongo[srv]>=4.15.1",
     "email-validator>=2.3.0",
+    "sqlalchemy>=2.0.43",
+    "psycopg2-binary>=2.9.10",
 ]

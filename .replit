@@ -1,6 +1,7 @@
 modules = ["python-3.11", "nodejs-20"]
 [agent]
 expertMode = true
+integrations = ["python_database:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
@@ -96,10 +97,6 @@ externalPort = 80
 [[ports]]
 localPort = 8000
 externalPort = 8000
-
-[[ports]]
-localPort = 37389
-externalPort = 3002
 
 [deployment]
 deploymentTarget = "vm"

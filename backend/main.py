@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 from app.core.config import settings
-from app.core.database import connect_to_mongo, close_mongo_connection, get_database
+from app.core.database import create_tables, test_connection, get_db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -13,13 +13,19 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     try:
-        await connect_to_mongo()
+        # Test database connection
+        if test_connection():
+            logger.info("Database connection successful")
+            # Create all tables
+            create_tables()
+            logger.info("Database tables created successfully")
+        else:
+            logger.error("Database connection failed")
     except Exception as e:
-        logger.error(f"Database connection failed during startup: {e}")
-        # Continue without database for development
+        logger.error(f"Database startup failed: {e}")
     yield
     # Shutdown
-    await close_mongo_connection()
+    logger.info("Application shutdown")
 
 app = FastAPI(
     title=settings.app_name,
@@ -46,36 +52,38 @@ async def root():
     }
 
 @app.get("/health")
-async def health_check(db = Depends(get_database)):
+async def health_check(db = Depends(get_db)):
     try:
         # Test database connection
-        if db is not None:
-            await db.command('ping')
-            db_status = "connected"
-        else:
-            db_status = "disconnected"
-    except Exception:
+        from sqlalchemy import text
+        result = db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
         db_status = "error"
 
     return {
         "status": "healthy",
         "database": db_status,
         "database_name": settings.database_name,
-        "environment": "development"
+        "environment": "development",
+        "database_url_set": bool(settings.database_url)
     }
 
-# Include API routes
-from app.api.v1.api import api_router
-app.include_router(api_router, prefix="/api/v1")
+# Include API routes (temporarily commented for initial setup)
+# from app.api.v1.api import api_router
+# app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/api/v1/status")
 async def api_status():
     return {
         "api_version": "v1",
+        "database_connected": test_connection(),
         "modules": {
-            "crm": "initialized",
-            "hrms": "initialized",
-            "auth": "initialized"
+            "database": "connected" if test_connection() else "disconnected",
+            "crm": "ready for implementation",
+            "hrms": "ready for implementation",
+            "auth": "ready for implementation"
         }
     }
 

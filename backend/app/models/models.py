@@ -1,16 +1,20 @@
-from typing import Optional, List, Dict, Any
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Date, Time, Enum, DECIMAL
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from datetime import datetime, date
-from bson import ObjectId
-from enum import Enum
+import enum
+from ..core.database import Base
 
-# Enums for various status types
-class UserRole(str, Enum):
+# Enums for better data integrity
+class UserRole(enum.Enum):
     ADMIN = "admin"
-    HR_MANAGER = "hr_manager" 
-    SALES_TEAM = "sales_team"
+    HR_MANAGER = "hr_manager"
+    SALES_MANAGER = "sales_manager"
+    SALES_REP = "sales_rep"
     EMPLOYEE = "employee"
+    MANAGER = "manager"
 
-class LeadStatus(str, Enum):
+class LeadStatus(enum.Enum):
     NEW = "new"
     CONTACTED = "contacted"
     QUALIFIED = "qualified"
@@ -19,208 +23,510 @@ class LeadStatus(str, Enum):
     CLOSED_WON = "closed_won"
     CLOSED_LOST = "closed_lost"
 
-class CustomerStatus(str, Enum):
+class CustomerStatus(enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     PROSPECT = "prospect"
+    CHURNED = "churned"
 
-class EmployeeStatus(str, Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    TERMINATED = "terminated"
+class DealStage(enum.Enum):
+    PROSPECTING = "prospecting"
+    QUALIFICATION = "qualification"
+    NEEDS_ANALYSIS = "needs_analysis"
+    VALUE_PROPOSITION = "value_proposition"
+    PROPOSAL = "proposal"
+    NEGOTIATION = "negotiation"
+    CLOSED_WON = "closed_won"
+    CLOSED_LOST = "closed_lost"
 
-class LeaveStatus(str, Enum):
+class LeaveType(enum.Enum):
+    ANNUAL = "annual"
+    SICK = "sick"
+    MATERNITY = "maternity"
+    PATERNITY = "paternity"
+    PERSONAL = "personal"
+    EMERGENCY = "emergency"
+    UNPAID = "unpaid"
+
+class LeaveStatus(enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
     CANCELLED = "cancelled"
 
-class AttendanceStatus(str, Enum):
+class AttendanceStatus(enum.Enum):
     PRESENT = "present"
     ABSENT = "absent"
-    HALF_DAY = "half_day"
     LATE = "late"
+    HALF_DAY = "half_day"
+    WFH = "work_from_home"
 
-# Base model class
-class BaseModel:
-    """Base model with common fields and methods"""
+class EmployeeStatus(enum.Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    TERMINATED = "terminated"
+    ON_LEAVE = "on_leave"
 
-    def __init__(self, **data):
-        for key, value in data.items():
-            setattr(self, key, value)
+# Authentication Models
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    username = Column(String(100), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=False)
+    phone = Column(String(20))
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.EMPLOYEE)
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+    last_login = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    employee_profile = relationship("Employee", back_populates="user", uselist=False)
+    created_leads = relationship("Lead", back_populates="created_by")
+    assigned_leads = relationship("Lead", foreign_keys="Lead.assigned_to_id", back_populates="assigned_to")
+    created_customers = relationship("Customer", back_populates="created_by")
+    created_deals = relationship("Deal", back_populates="created_by")
+    assigned_deals = relationship("Deal", foreign_keys="Deal.assigned_to_id", back_populates="assigned_to")
 
-        if not hasattr(self, 'created_at'):
-            self.created_at = datetime.utcnow()
-        if not hasattr(self, 'updated_at'):
-            self.updated_at = datetime.utcnow()
+# Company/Organization Models
+class Company(Base):
+    __tablename__ = "companies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    domain = Column(String(100))
+    industry = Column(String(100))
+    size = Column(String(50))  # Small, Medium, Large, Enterprise
+    website = Column(String(255))
+    phone = Column(String(20))
+    email = Column(String(255))
+    address = Column(Text)
+    city = Column(String(100))
+    state = Column(String(100))
+    country = Column(String(100))
+    postal_code = Column(String(20))
+    annual_revenue = Column(DECIMAL(15, 2))
+    logo_url = Column(String(500))
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    customers = relationship("Customer", back_populates="company")
+    leads = relationship("Lead", back_populates="company")
+    contacts = relationship("Contact", back_populates="company")
 
-    def to_dict(self):
-        """Convert model to dictionary"""
-        result = {}
-        for key, value in self.__dict__.items():
-            if isinstance(value, ObjectId):
-                result[key] = str(value)
-            elif isinstance(value, datetime):
-                result[key] = value.isoformat()
-            elif isinstance(value, date):
-                result[key] = value.isoformat()
-            else:
-                result[key] = value
-        return result
+# CRM Models
+class Lead(Base):
+    __tablename__ = "leads"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=False, index=True)
+    phone = Column(String(20))
+    job_title = Column(String(255))
+    company_id = Column(Integer, ForeignKey("companies.id"))
+    source = Column(String(100))  # Website, Referral, Cold Call, etc.
+    status = Column(Enum(LeadStatus), default=LeadStatus.NEW)
+    score = Column(Integer, default=0)  # Lead scoring 0-100
+    estimated_value = Column(DECIMAL(12, 2))
+    expected_close_date = Column(Date)
+    notes = Column(Text)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assigned_to_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    company = relationship("Company", back_populates="leads")
+    created_by = relationship("User", foreign_keys=[created_by_id], back_populates="created_leads")
+    assigned_to = relationship("User", foreign_keys=[assigned_to_id], back_populates="assigned_leads")
+    activities = relationship("Activity", back_populates="lead")
 
-class UserModel(BaseModel):
-    """User model for authentication and authorization"""
-    collection_name = "users"
+class Customer(Base):
+    __tablename__ = "customers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    phone = Column(String(20))
+    mobile = Column(String(20))
+    job_title = Column(String(255))
+    company_id = Column(Integer, ForeignKey("companies.id"))
+    status = Column(Enum(CustomerStatus), default=CustomerStatus.PROSPECT)
+    customer_type = Column(String(50))  # Individual, Business
+    priority = Column(String(20), default="Medium")  # High, Medium, Low
+    lifetime_value = Column(DECIMAL(15, 2), default=0)
+    total_purchases = Column(DECIMAL(15, 2), default=0)
+    last_contact_date = Column(DateTime(timezone=True))
+    preferred_contact_method = Column(String(50))
+    billing_address = Column(Text)
+    shipping_address = Column(Text)
+    notes = Column(Text)
+    tags = Column(Text)  # JSON string for flexibility
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    company = relationship("Company", back_populates="customers")
+    created_by = relationship("User", back_populates="created_customers")
+    deals = relationship("Deal", back_populates="customer")
+    activities = relationship("Activity", back_populates="customer")
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.email: str = data.get('email')
-        self.full_name: str = data.get('full_name')
-        self.hashed_password: str = data.get('hashed_password')
-        self.role: UserRole = data.get('role', UserRole.EMPLOYEE)
-        self.is_active: bool = data.get('is_active', True)
-        self.last_login: Optional[datetime] = data.get('last_login')
+class Deal(Base):
+    __tablename__ = "deals"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    stage = Column(Enum(DealStage), default=DealStage.PROSPECTING)
+    value = Column(DECIMAL(12, 2), nullable=False)
+    probability = Column(Integer, default=10)  # 0-100%
+    expected_close_date = Column(Date)
+    actual_close_date = Column(Date)
+    description = Column(Text)
+    next_step = Column(String(500))
+    competition = Column(String(255))
+    decision_maker = Column(String(255))
+    budget_confirmed = Column(Boolean, default=False)
+    authority_confirmed = Column(Boolean, default=False)
+    need_confirmed = Column(Boolean, default=False)
+    timeline_confirmed = Column(Boolean, default=False)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assigned_to_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    customer = relationship("Customer", back_populates="deals")
+    created_by = relationship("User", foreign_keys=[created_by_id], back_populates="created_deals")
+    assigned_to = relationship("User", foreign_keys=[assigned_to_id], back_populates="assigned_deals")
+    activities = relationship("Activity", back_populates="deal")
 
-class CustomerModel(BaseModel):
-    """Customer model for CRM"""
-    collection_name = "customers"
+class Contact(Base):
+    __tablename__ = "contacts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=False, index=True)
+    phone = Column(String(20))
+    mobile = Column(String(20))
+    job_title = Column(String(255))
+    department = Column(String(100))
+    company_id = Column(Integer, ForeignKey("companies.id"))
+    is_primary = Column(Boolean, default=False)
+    is_decision_maker = Column(Boolean, default=False)
+    linkedin_url = Column(String(500))
+    twitter_handle = Column(String(100))
+    birthday = Column(Date)
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    company = relationship("Company", back_populates="contacts")
+    activities = relationship("Activity", back_populates="contact")
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.name: str = data.get('name')
-        self.email: Optional[str] = data.get('email')
-        self.phone: Optional[str] = data.get('phone')
-        self.company: str = data.get('company')
-        self.industry: Optional[str] = data.get('industry')
-        self.status: CustomerStatus = data.get('status', CustomerStatus.PROSPECT)
-        self.billing_address: Optional[str] = data.get('billing_address')
-        self.notes: Optional[str] = data.get('notes')
+# Activity/Communication Log
+class Activity(Base):
+    __tablename__ = "activities"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String(50), nullable=False)  # Call, Email, Meeting, Note, Task
+    subject = Column(String(255), nullable=False)
+    description = Column(Text)
+    outcome = Column(String(100))
+    duration_minutes = Column(Integer)
+    scheduled_date = Column(DateTime(timezone=True))
+    completed_date = Column(DateTime(timezone=True))
+    is_completed = Column(Boolean, default=False)
+    priority = Column(String(20), default="Medium")
+    
+    # Related entities
+    lead_id = Column(Integer, ForeignKey("leads.id"))
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    deal_id = Column(Integer, ForeignKey("deals.id"))
+    contact_id = Column(Integer, ForeignKey("contacts.id"))
+    
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    lead = relationship("Lead", back_populates="activities")
+    customer = relationship("Customer", back_populates="activities")
+    deal = relationship("Deal", back_populates="activities")
+    contact = relationship("Contact", back_populates="activities")
+    created_by = relationship("User")
 
-class LeadModel(BaseModel):
-    """Lead model for CRM"""
-    collection_name = "leads"
+# HRMS Models
+class Department(Base):
+    __tablename__ = "departments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    code = Column(String(20), unique=True)
+    description = Column(Text)
+    manager_id = Column(Integer, ForeignKey("employees.id"))
+    budget = Column(DECIMAL(12, 2))
+    location = Column(String(255))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    employees = relationship("Employee", back_populates="department")
+    manager = relationship("Employee", foreign_keys=[manager_id])
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.name: str = data.get('name')
-        self.email: Optional[str] = data.get('email')
-        self.phone: Optional[str] = data.get('phone')
-        self.company: Optional[str] = data.get('company')
-        self.source: Optional[str] = data.get('source')
-        self.status: LeadStatus = data.get('status', LeadStatus.NEW)
-        self.notes: Optional[str] = data.get('notes')
-        self.assigned_to: Optional[str] = data.get('assigned_to')
+class Employee(Base):
+    __tablename__ = "employees"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(String(50), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=False, unique=True)
+    phone = Column(String(20))
+    emergency_contact_name = Column(String(255))
+    emergency_contact_phone = Column(String(20))
+    
+    # Job Information
+    job_title = Column(String(255), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"))
+    manager_id = Column(Integer, ForeignKey("employees.id"))
+    hire_date = Column(Date, nullable=False)
+    termination_date = Column(Date)
+    employment_type = Column(String(50))  # Full-time, Part-time, Contract, Intern
+    status = Column(Enum(EmployeeStatus), default=EmployeeStatus.ACTIVE)
+    
+    # Personal Information
+    date_of_birth = Column(Date)
+    gender = Column(String(20))
+    marital_status = Column(String(20))
+    nationality = Column(String(50))
+    address = Column(Text)
+    city = Column(String(100))
+    state = Column(String(100))
+    country = Column(String(100))
+    postal_code = Column(String(20))
+    
+    # Compensation
+    salary = Column(DECIMAL(10, 2))
+    hourly_rate = Column(DECIMAL(8, 2))
+    currency = Column(String(10), default="USD")
+    pay_frequency = Column(String(20))  # Weekly, Bi-weekly, Monthly
+    
+    # Additional Info
+    skills = Column(Text)  # JSON string
+    education = Column(Text)  # JSON string
+    certifications = Column(Text)  # JSON string
+    notes = Column(Text)
+    profile_picture_url = Column(String(500))
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="employee_profile")
+    department = relationship("Department", back_populates="employees")
+    manager = relationship("Employee", remote_side=[id])
+    direct_reports = relationship("Employee")
+    attendance_records = relationship("Attendance", back_populates="employee")
+    leave_requests = relationship("LeaveRequest", back_populates="employee")
+    performance_reviews = relationship("PerformanceReview", back_populates="employee")
+    payroll_records = relationship("PayrollRecord", back_populates="employee")
 
-class EmployeeModel(BaseModel):
-    """Employee model for HRMS"""
-    collection_name = "employees"
+class Attendance(Base):
+    __tablename__ = "attendance"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    check_in_time = Column(Time)
+    check_out_time = Column(Time)
+    break_time_minutes = Column(Integer, default=0)
+    total_hours = Column(DECIMAL(4, 2))
+    overtime_hours = Column(DECIMAL(4, 2), default=0)
+    status = Column(Enum(AttendanceStatus), default=AttendanceStatus.PRESENT)
+    location = Column(String(255))  # Office, Home, Client Site
+    ip_address = Column(String(45))
+    notes = Column(Text)
+    approved_by_id = Column(Integer, ForeignKey("employees.id"))
+    approved_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    employee = relationship("Employee", back_populates="attendance_records")
+    approved_by = relationship("Employee", foreign_keys=[approved_by_id])
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.employee_id: str = data.get('employee_id')
-        self.full_name: str = data.get('full_name')
-        self.email: str = data.get('email')
-        self.phone: Optional[str] = data.get('phone')
-        self.department_id: Optional[str] = data.get('department_id')
-        self.position: str = data.get('position')
-        self.hire_date: date = data.get('hire_date')
-        self.salary: Optional[float] = data.get('salary')
-        self.status: EmployeeStatus = data.get('status', EmployeeStatus.ACTIVE)
-        self.manager_id: Optional[str] = data.get('manager_id')
+class LeaveRequest(Base):
+    __tablename__ = "leave_requests"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    leave_type = Column(Enum(LeaveType), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    total_days = Column(Integer, nullable=False)
+    reason = Column(Text, nullable=False)
+    status = Column(Enum(LeaveStatus), default=LeaveStatus.PENDING)
+    approved_by_id = Column(Integer, ForeignKey("employees.id"))
+    approved_at = Column(DateTime(timezone=True))
+    rejection_reason = Column(Text)
+    emergency_contact = Column(String(255))
+    substitute_employee_id = Column(Integer, ForeignKey("employees.id"))
+    documents_url = Column(Text)  # JSON array of document URLs
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    employee = relationship("Employee", back_populates="leave_requests")
+    approved_by = relationship("Employee", foreign_keys=[approved_by_id])
+    substitute = relationship("Employee", foreign_keys=[substitute_employee_id])
 
-class DepartmentModel(BaseModel):
-    """Department model for HRMS"""
-    collection_name = "departments"
+class PerformanceReview(Base):
+    __tablename__ = "performance_reviews"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    reviewer_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    review_period_start = Column(Date, nullable=False)
+    review_period_end = Column(Date, nullable=False)
+    overall_rating = Column(DECIMAL(3, 2))  # 0.00 - 5.00
+    goals_achievement = Column(DECIMAL(3, 2))
+    technical_skills = Column(DECIMAL(3, 2))
+    communication_skills = Column(DECIMAL(3, 2))
+    teamwork = Column(DECIMAL(3, 2))
+    leadership = Column(DECIMAL(3, 2))
+    initiative = Column(DECIMAL(3, 2))
+    strengths = Column(Text)
+    areas_for_improvement = Column(Text)
+    goals_next_period = Column(Text)
+    employee_comments = Column(Text)
+    reviewer_comments = Column(Text)
+    hr_comments = Column(Text)
+    status = Column(String(20), default="Draft")  # Draft, In Progress, Completed
+    submitted_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    employee = relationship("Employee", back_populates="performance_reviews")
+    reviewer = relationship("Employee", foreign_keys=[reviewer_id])
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.name: str = data.get('name')
-        self.description: Optional[str] = data.get('description')
-        self.manager_id: Optional[str] = data.get('manager_id')
+class PayrollRecord(Base):
+    __tablename__ = "payroll_records"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    pay_period_start = Column(Date, nullable=False)
+    pay_period_end = Column(Date, nullable=False)
+    
+    # Earnings
+    base_salary = Column(DECIMAL(10, 2), nullable=False)
+    overtime_pay = Column(DECIMAL(10, 2), default=0)
+    bonus = Column(DECIMAL(10, 2), default=0)
+    commission = Column(DECIMAL(10, 2), default=0)
+    allowances = Column(DECIMAL(10, 2), default=0)
+    gross_pay = Column(DECIMAL(10, 2), nullable=False)
+    
+    # Deductions
+    tax_deduction = Column(DECIMAL(10, 2), default=0)
+    social_security = Column(DECIMAL(10, 2), default=0)
+    health_insurance = Column(DECIMAL(10, 2), default=0)
+    retirement_contribution = Column(DECIMAL(10, 2), default=0)
+    other_deductions = Column(DECIMAL(10, 2), default=0)
+    total_deductions = Column(DECIMAL(10, 2), default=0)
+    
+    net_pay = Column(DECIMAL(10, 2), nullable=False)
+    
+    # Hours
+    regular_hours = Column(DECIMAL(5, 2), default=0)
+    overtime_hours = Column(DECIMAL(5, 2), default=0)
+    
+    payment_date = Column(Date)
+    payment_method = Column(String(50))  # Bank Transfer, Check, Cash
+    bank_account = Column(String(100))
+    
+    notes = Column(Text)
+    processed_by_id = Column(Integer, ForeignKey("employees.id"))
+    processed_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    employee = relationship("Employee", back_populates="payroll_records")
+    processed_by = relationship("Employee", foreign_keys=[processed_by_id])
 
-class LeaveRequestModel(BaseModel):
-    """Leave request model for HRMS"""
-    collection_name = "leave_requests"
+# Notification System
+class Notification(Base):
+    __tablename__ = "notifications"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String(50), nullable=False)  # info, warning, error, success
+    is_read = Column(Boolean, default=False)
+    action_url = Column(String(500))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    read_at = Column(DateTime(timezone=True))
+    
+    # Relationships
+    user = relationship("User")
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.employee_id: str = data.get('employee_id')
-        self.leave_type: str = data.get('leave_type')
-        self.start_date: date = data.get('start_date')
-        self.end_date: date = data.get('end_date')
-        self.days_requested: int = data.get('days_requested')
-        self.reason: Optional[str] = data.get('reason')
-        self.status: LeaveStatus = data.get('status', LeaveStatus.PENDING)
-        self.approved_by: Optional[str] = data.get('approved_by')
-        self.approved_at: Optional[datetime] = data.get('approved_at')
+# Document Management
+class Document(Base):
+    __tablename__ = "documents"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer)
+    file_type = Column(String(50))
+    description = Column(Text)
+    category = Column(String(100))  # Contract, Invoice, HR Document, etc.
+    
+    # Related entities
+    employee_id = Column(Integer, ForeignKey("employees.id"))
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    deal_id = Column(Integer, ForeignKey("deals.id"))
+    
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    is_confidential = Column(Boolean, default=False)
+    expires_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    employee = relationship("Employee")
+    customer = relationship("Customer")
+    deal = relationship("Deal")
+    uploaded_by = relationship("User")
 
-class AttendanceModel(BaseModel):
-    """Attendance model for HRMS"""
-    collection_name = "attendance"
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._id = data.get('_id')
-        self.id = data.get('id', str(ObjectId()))
-        self.employee_id: str = data.get('employee_id')
-        self.date: date = data.get('date', datetime.utcnow().date())
-        self.check_in: datetime = data.get('check_in')
-        self.check_out: Optional[datetime] = data.get('check_out')
-        self.hours_worked: Optional[float] = data.get('hours_worked')
-        self.status: AttendanceStatus = data.get('status', AttendanceStatus.PRESENT)
-        self.notes: Optional[str] = data.get('notes')
-
-# Database indexes for optimal performance
-DATABASE_INDEXES = {
-    "users": [
-        {"keys": [("email", 1)], "unique": True},
-        {"keys": [("role", 1)]},
-        {"keys": [("is_active", 1)]}
-    ],
-    "customers": [
-        {"keys": [("email", 1)]},
-        {"keys": [("company", 1)]},
-        {"keys": [("status", 1)]},
-        {"keys": [("industry", 1)]}
-    ],
-    "leads": [
-        {"keys": [("email", 1)]},
-        {"keys": [("status", 1)]},
-        {"keys": [("assigned_to", 1)]},
-        {"keys": [("source", 1)]}
-    ],
-    "employees": [
-        {"keys": [("employee_id", 1)], "unique": True},
-        {"keys": [("email", 1)], "unique": True},
-        {"keys": [("department_id", 1)]},
-        {"keys": [("status", 1)]},
-        {"keys": [("manager_id", 1)]}
-    ],
-    "departments": [
-        {"keys": [("name", 1)], "unique": True},
-        {"keys": [("manager_id", 1)]}
-    ],
-    "leave_requests": [
-        {"keys": [("employee_id", 1)]},
-        {"keys": [("status", 1)]},
-        {"keys": [("start_date", 1)]},
-        {"keys": [("approved_by", 1)]}
-    ],
-    "attendance": [
-        {"keys": [("employee_id", 1), ("date", 1)], "unique": True},
-        {"keys": [("date", 1)]},
-        {"keys": [("status", 1)]}
-    ]
-}
+# System Settings
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, nullable=False)
+    value = Column(Text)
+    description = Column(Text)
+    category = Column(String(50))  # General, Email, Security, etc.
+    is_encrypted = Column(Boolean, default=False)
+    updated_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    updated_by = relationship("User")
