@@ -68,7 +68,7 @@ async def get_database():
 
 async def create_indexes():
     """Create database indexes for optimal performance."""
-    if not db.database:
+    if db.database is None:
         logger.warning("Database not connected, skipping index creation")
         return
 

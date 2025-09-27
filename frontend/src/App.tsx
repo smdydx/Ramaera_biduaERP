@@ -60,7 +60,10 @@ function App() {
     // Check backend connectivity
     const checkBackend = async () => {
       try {
-        const response = await fetch('/api/v1/status');
+        const apiUrl = window.location.hostname === 'localhost' 
+          ? 'http://localhost:5000/api/v1/status'
+          : `${window.location.protocol}//${window.location.hostname}:5000/api/v1/status`;
+        const response = await fetch(apiUrl);
         if (response.ok) {
           setBackendStatus('connected');
         } else {
